@@ -1,506 +1,536 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  PhoneCall, 
-  BookOpen, 
-  Gamepad2, 
-  Shuffle, 
-  ChevronLeft, 
-  ChevronRight, 
-  RotateCcw,
-  CheckCircle2,
-  XCircle,
-  Trophy,
-  Award,
-  AlertTriangle,
-  Zap,
-  Home,
-  ArrowLeft,
-  History,
-  Hash,
-  Network,
-  Server,
-  Gauge,
-  MessageSquare,
-  List
-} from 'lucide-react';
-
-// --- BASE DE DONNÉES COMPLÈTE (62 éléments conservés) ---
-const database = [
-  { a: "Full-duplex", d: "Mode de communication dans les deux sens en même temps (typique de la téléphonie)." },
-  { a: "Half-duplex", d: "Communication dans un sens puis l'autre, pas en même temps (ex: talkie-walkie)." },
-  { a: "Signalisation", d: "Ensemble des messages échangés sur le réseau pour mettre en œuvre un service (décrocher, numéroter, faire sonner)." },
-  { a: "RTC", d: "Réseau Téléphonique Commuté. Le réseau analogique historique (en cours de démantèlement, fin prévue 2030)." },
-  { a: "URA", d: "Unité de Raccordement d'Abonnés. Équipement du réseau historique opérateur." },
-  { a: "Répartiteur", d: "Salle historique chez l'opérateur (Orange) où arrivent toutes les lignes de cuivre des abonnés." },
-  { a: "DSLAM", d: "Multiplexeur d'accès DSL. Équipement opérateur pour grouper le trafic internet ADSL." },
-  { a: "DTMF (Q23)", d: "Dual-Tone Multi-Frequency. Envoi de combinaisons de 2 fréquences à partir du commutateur pour envoyer le numéro appelé." },
-  { a: "Bande 300-3400 Hz", d: "La bande de fréquences utilisée pour transmettre la voix humaine en téléphonie analogique classique." },
-  { a: "RNIS", d: "Réseau Numérique à Intégration de Services (ex: Numéris). Remplaçant de l'analogique avant la VoIP." },
-  { a: "Accès T0 (BRI)", d: "Accès de base RNIS : comprend 2 canaux B à 64kbps (voix) + 1 canal D à 16kbps (signalisation)." },
-  { a: "Accès T2 (PRI)", d: "Accès primaire RNIS : comprend 30 canaux B (pour la voix) + 1 canal D (pour la signalisation)." },
-  { a: "Canal D", d: "Le canal du réseau RNIS réservé exclusivement au transport de la signalisation (messages Q931)." },
-  { a: "Q.931", d: "Protocole de signalisation utilisé sur le canal D du réseau RNIS." },
-  { a: "SETUP", d: "Message Q.931 envoyé pour demander l'établissement d'un appel RNIS." },
-  { a: "CONNECT", d: "Message Q.931 indiquant que l'appelé a décroché et que la conversation commence." },
-  { a: "PABX", d: "Private Automatic Branch eXchange. L'autocommutateur traditionnel (analogique/numérique) d'une entreprise." },
-  { a: "IPBX", d: "PABX moderne organisé autour d'un Serveur d'appel, gérant la téléphonie sur réseau IP." },
-  { a: "Centrex IP", d: "Solution où l'IPBX (le serveur d'appel) n'est pas dans l'entreprise mais déporté dans le cloud chez l'opérateur ITSP." },
-  { a: "Hardphone", d: "Téléphone IP physique posé sur le bureau." },
-  { a: "Softphone", d: "Logiciel de téléphonie installé sur PC, nécessitant casque et micro (possède souvent la fonction click2call)." },
-  { a: "POPC", d: "Poste Opérateur PC. L'outil informatique du standardiste." },
-  { a: "DECT", d: "Norme de la téléphonie sans fil. Dans une entreprise, les combinés DECT se connectent à des bornes raccordées au LAN." },
-  { a: "SDA / DID", d: "Sélection Directe à l'Arrivée (Direct Inward Dialling). Permet d'appeler directement un poste interne sans passer par l'accueil." },
-  { a: "SVI", d: "Serveur Vocal Interactif. Répond avec des menus vocaux navigués via les touches DTMF ('Tapez 1...')." },
-  { a: "ACD", d: "Distribution Automatique d'Appel. Oriente l'appel entrant vers un groupe selon la compétence ou disponibilité." },
-  { a: "PoE (802.3af)", d: "Power over Ethernet. Norme permettant au Switch d'alimenter électriquement le téléphone IP via le câble RJ45." },
-  { a: "LAN", d: "Le réseau local de l'entreprise où sont branchés les PC et les téléphones IP." },
-  { a: "VLAN", d: "Réseau virtuel. On sépare souvent les PC et les téléphones sur deux VLANs distincts pour la sécurité et la QoS." },
-  { a: "DHCP", d: "Protocole qui attribue automatiquement une adresse IP au téléphone fixe quand il démarre." },
-  { a: "FTP / TFTP", d: "Protocoles utilisés par le téléphone IP pour récupérer sa configuration ou mettre à jour son Firmware au démarrage." },
-  { a: "ARCEP", d: "L'autorité française de régulation qui gère le plan de numérotation national." },
-  { a: "E.164", d: "Recommandation de l'UIT-T décrivant la façon d'attribuer les numéros de téléphone internationaux." },
-  { a: "ZABPQ", d: "Format du plan de numérotation français à 10 chiffres (Z = zone géo, A/B = commutateur, P/Q = équipement)." },
-  { a: "ToIP", d: "Telephony over IP. L'infrastructure complète (matériel + réseau) pour faire de la téléphonie sur IP en entreprise." },
-  { a: "VoIP", d: "La technique de production et de transport de paquets contenant la voix numérisée." },
-  { a: "Codec", d: "Codeur/Décodeur. Algorithme qui numérise et compresse la voix. Ex: G.711, G.722, G.729, Opus." },
-  { a: "G.711", d: "Codec très courant (alaw ou ulaw) échantillonnant la voix à 8kHz, nécessitant environ 64 kbps de bande passante." },
-  { a: "Paquet de voix", d: "En ToIP, on regroupe généralement 20 ms d'échantillons de voix dans un seul paquet IP." },
-  { a: "Silence Suppression", d: "Technique réseau permettant de ne rien émettre si personne ne parle, pour économiser la bande passante." },
-  { a: "RTP", d: "Realtime Transport Protocol. Le protocole (généralement sur UDP) qui transporte effectivement les paquets de voix." },
-  { a: "RTCP", d: "Realtime Transport Control Protocol. Contrôle le flux RTP en remontant l'état de la transmission (pertes, gigue)." },
-  { a: "SRTP", d: "Secure RTP. Chiffre le flux de la voix pour empêcher l'écoute pirate (replay)." },
-  { a: "QoS", d: "Quality of Service. Règles configurées sur les switchs/routeurs pour prioriser les paquets Voix par rapport aux Data." },
-  { a: "Latence", d: "Temps entre l'émission de la voix et sa réception. Doit être inférieur à 150 ms." },
-  { a: "Gigue (Jitter)", d: "La variation de la latence entre les différents paquets. Doit être inférieure à 40 ms." },
-  { a: "802.1p/q", d: "Normes permettant de marquer les trames Ethernet au niveau 2 (Switch) pour appliquer la QoS." },
-  { a: "DiffServ", d: "Mécanisme de QoS au niveau 3 (Routeur) modifiant le champ DSCP de l'en-tête du paquet IP." },
-  { a: "SIP", d: "Session Initiation Protocol. Le protocole de signalisation star (RFC 3261 par l'IETF) pour établir/gérer les appels." },
-  { a: "H.323", d: "L'ancêtre de SIP. Protocole de signalisation historique de la ToIP, quasiment disparu aujourd'hui." },
-  { a: "ITSP", d: "Internet Telephony Service Provider (ex: OVH, Orange). Fournisseur de liens Trunk SIP pour sortir vers l'extérieur." },
-  { a: "Trunk SIP", d: "La liaison 'virtuelle' entre l'IPBX de l'entreprise et l'opérateur (ITSP) via Internet." },
-  { a: "AOR", d: "Address Of Record. Identifiant SIP d'un usager, format type e-mail (ex: sip:jean@domaine.fr)." },
-  { a: "Proxy SIP", d: "Entité du serveur SIP qui retransmet les requêtes vers le bon interlocuteur." },
-  { a: "Registrar", d: "Serveur SIP où le téléphone vient enregistrer son adresse IP actuelle pour qu'on puisse le retrouver." },
-  { a: "Serveur de localisation", d: "Base de données stockant les localisations (adresses IP) des téléphones, alimentée par le Registrar." },
-  { a: "INVITE", d: "Requête SIP. Demande d'établissement d'appel (C'est le début d'un dialogue)." },
-  { a: "REGISTER", d: "Requête SIP. Demande d'enregistrement d'un téléphone auprès du serveur Registrar." },
-  { a: "ACK", d: "Requête SIP. Confirme obligatoirement la bonne réception d'une réponse finale (comme un 200 OK)." },
-  { a: "BYE", d: "Requête SIP. Termine un appel (correspond au raccrochage)." },
-  { a: "100 Trying", d: "Réponse SIP (Provisoire). Indique que le serveur a bien reçu l'INVITE et le traite." },
-  { a: "180 Ringing", d: "Réponse SIP (Provisoire). Indique que le téléphone de destination est en train de sonner." },
-  { a: "200 OK", d: "Réponse SIP (Positive). Indique le succès de la requête (La personne a décroché, ou le REGISTER a marché)." },
-  { a: "401 Unauthorized", d: "Réponse SIP (Erreur). Le serveur refuse l'action et demande à l'usager de s'authentifier (login/mdp)." }
-];
-
-// --- DONNÉES DES THÈMES DU COURS ---
-const themesData = [
-  {
-    id: "bases",
-    title: "Bases & Réseaux Historiques",
-    icon: History,
-    terms: ["Full-duplex", "Half-duplex", "Signalisation", "RTC", "URA", "Répartiteur", "DSLAM", "Bande 300-3400 Hz"]
-  },
-  {
-    id: "num",
-    title: "Numérotation",
-    icon: Hash,
-    terms: ["DTMF (Q23)", "ARCEP", "E.164", "ZABPQ"]
-  },
-  {
-    id: "rnis",
-    title: "Réseau RNIS",
-    icon: Network,
-    terms: ["RNIS", "Accès T0 (BRI)", "Accès T2 (PRI)", "Canal D", "Q.931", "SETUP", "CONNECT"]
-  },
-  {
-    id: "archi",
-    title: "Équipements & Architecture",
-    icon: Server,
-    terms: ["PABX", "IPBX", "Centrex IP", "Hardphone", "Softphone", "POPC", "DECT", "SDA / DID", "SVI", "ACD", "PoE (802.3af)", "LAN", "VLAN", "DHCP", "FTP / TFTP"]
-  },
-  {
-    id: "toip",
-    title: "ToIP, VoIP & QoS",
-    icon: Gauge,
-    terms: ["ToIP", "VoIP", "Codec", "G.711", "Paquet de voix", "Silence Suppression", "RTP", "RTCP", "SRTP", "QoS", "Latence", "Gigue (Jitter)", "802.1p/q", "DiffServ"]
-  },
-  {
-    id: "sip",
-    title: "Protocoles & SIP",
-    icon: MessageSquare,
-    terms: ["SIP", "H.323", "ITSP", "Trunk SIP", "AOR", "Proxy SIP", "Registrar", "Serveur de localisation", "INVITE", "REGISTER", "ACK", "BYE", "100 Trying", "180 Ringing", "200 OK", "401 Unauthorized"]
-  }
-];
-
-export default function App() {
-  const [mode, setMode] = useState('home'); // 'home', 'theme', 'flashcards', 'quiz', 'results'
-  const [currentTheme, setCurrentTheme] = useState(null);
-  const [deck, setDeck] = useState([...database]);
-  
-  // Flashcards State
-  const [cardIndex, setCardIndex] = useState(0);
-  const [isFlipped, setIsFlipped] = useState(false);
-
-  // Quiz State
-  const Q_MAX = 15;
-  const [quizQuestions, setQuizQuestions] = useState([]);
-  const [currentQIndex, setCurrentQIndex] = useState(0);
-  const [quizOptions, setQuizOptions] = useState([]);
-  const [score, setScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [isAnswered, setIsAnswered] = useState(false);
-
-  // --- FLASHCARDS LOGIC ---
-  const handleNextCard = useCallback(() => {
-    setIsFlipped(false);
-    setTimeout(() => {
-      setCardIndex((prev) => (prev + 1) % deck.length);
-    }, 150); // Petit délai pour laisser la carte se retourner face cachée
-  }, [deck.length]);
-
-  const handlePrevCard = useCallback(() => {
-    setIsFlipped(false);
-    setTimeout(() => {
-      setCardIndex((prev) => (prev - 1 + deck.length) % deck.length);
-    }, 150);
-  }, [deck.length]);
-
-  const handleShuffleDeck = () => {
-    const shuffled = [...database].sort(() => Math.random() - 0.5);
-    setDeck(shuffled);
-    setCardIndex(0);
-    setIsFlipped(false);
-  };
-
-  // Keyboard navigation for flashcards
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (mode !== 'flashcards') return;
-      if (e.key === 'ArrowRight') handleNextCard();
-      if (e.key === 'ArrowLeft') handlePrevCard();
-      if (e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        setIsFlipped(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, handleNextCard, handlePrevCard]);
-
-  // --- QUIZ LOGIC ---
-  const startQuiz = () => {
-    const shuffledDb = [...database].sort(() => Math.random() - 0.5);
-    const selectedQuestions = shuffledDb.slice(0, Q_MAX);
-    
-    setQuizQuestions(selectedQuestions);
-    setCurrentQIndex(0);
-    setScore(0);
-    setIsAnswered(false);
-    setSelectedAnswer(null);
-    setMode('quiz');
-    generateOptions(selectedQuestions[0]);
-  };
-
-  const generateOptions = (questionObj) => {
-    const correctDef = questionObj.d;
-    let options = [correctDef];
-    let safety = 0;
-    
-    // Pick 3 random wrong definitions
-    while (options.length < 4 && safety < 1000) {
-      const randomDef = database[Math.floor(Math.random() * database.length)].d;
-      if (!options.includes(randomDef)) {
-        options.push(randomDef);
-      }
-      safety++;
-    }
-    
-    // Shuffle options
-    setQuizOptions(options.sort(() => Math.random() - 0.5));
-  };
-
-  const handleAnswerClick = (answer) => {
-    if (isAnswered) return;
-    
-    setIsAnswered(true);
-    setSelectedAnswer(answer);
-    
-    const correctDef = quizQuestions[currentQIndex].d;
-    if (answer === correctDef) {
-      setScore(prev => prev + 1);
-    }
-
-    setTimeout(() => {
-      if (currentQIndex + 1 < Q_MAX) {
-        const nextQIndex = currentQIndex + 1;
-        setCurrentQIndex(nextQIndex);
-        setIsAnswered(false);
-        setSelectedAnswer(null);
-        generateOptions(quizQuestions[nextQIndex]);
-      } else {
-        setMode('results');
-      }
-    }, 1800);
-  };
-
-  // --- RESULTS LOGIC ---
-  const getFeedbackMessage = () => {
-    if (score === Q_MAX) return { msg: "100% de paquets reçus. Masterclass SIP ! 🏆", color: "text-emerald-500", icon: <Trophy size={48} className="mx-auto mb-4 text-emerald-500" /> };
-    if (score >= 12) return { msg: "Excellent niveau. Tu es prêt pour l'exam R2.04. 👍", color: "text-blue-500", icon: <Award size={48} className="mx-auto mb-4 text-blue-500" /> };
-    if (score >= 8) return { msg: "Un peu de gigue... Fais encore quelques flashcards ! 📻", color: "text-orange-500", icon: <AlertTriangle size={48} className="mx-auto mb-4 text-orange-500" /> };
-    return { msg: "Erreur 401 Unauthorized. Il faut réviser le cours ! ✂️", color: "text-red-500", icon: <Zap size={48} className="mx-auto mb-4 text-red-500" /> };
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-200 to-slate-400 text-slate-800 font-sans flex flex-col items-center justify-center p-4 sm:p-8">
-      
-      {/* HEADER */}
-      <div className="text-center mb-8">
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-800 drop-shadow-md mb-3 flex items-center justify-center gap-3">
-          <PhoneCall size={40} className="text-orange-600" />
-          R2.04 - Expert <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-orange-700">Téléphonie</span>
-        </h1>
-        <p className="text-slate-600 font-medium text-lg">Plus de 60 concepts tirés des 26 pages du cours de M. Toussaint</p>
-      </div>
-
-      {/* PHONE CONTAINER */}
-      <div className="bg-slate-800 w-full max-w-4xl rounded-[2.5rem] p-4 sm:p-6 shadow-2xl relative border-8 border-slate-900">
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>☎️ R2.04 - Expert Téléphonie</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Styles personnalisés pour la 3D et les animations */
+        .preserve-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .rotate-x-180 { transform: rotateX(180deg); }
+        .perspective-1000 { perspective: 1000px; }
         
-        {/* Notch / Camera visual detail */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-slate-900 rounded-b-xl z-20"></div>
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        
+        @keyframes slideInRight { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .animate-slide-in-right { animation: slideInRight 0.3s ease-out forwards; }
+        
+        @keyframes zoomIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .animate-zoom-in { animation: zoomIn 0.3s ease-out forwards; }
+        
+        @keyframes slideInBottom { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-slide-in-bottom { animation: slideInBottom 0.5s ease-out forwards; }
 
-        {/* PHONE SCREEN */}
-        <div className="bg-slate-50 w-full min-h-[600px] h-[80vh] max-h-[800px] rounded-[1.5rem] overflow-hidden flex flex-col relative shadow-[inset_0_0_20px_rgba(0,0,0,0.05)]">
-          
-          {/* HOME MENU VIEW */}
-          {mode === 'home' && (
-            <div className="flex flex-col h-full animate-in fade-in duration-300">
-              <div className="bg-slate-800 px-6 py-5 flex justify-center items-center font-bold text-white shadow-md z-10">
-                <span className="flex items-center gap-2 text-xl"><Home size={24} className="text-orange-500" /> Accueil de Révision</span>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-8 bg-slate-100 pb-8">
-                
-                <section>
-                  <h3 className="text-slate-500 font-black uppercase tracking-widest text-sm mb-4 px-2 flex items-center gap-2">
-                    <List size={18} /> Cours par thèmes
-                  </h3>
-                  <div className="flex flex-col gap-3">
-                    {themesData.map(t => (
-                      <button key={t.id} onClick={() => { setCurrentTheme(t); setMode('theme'); }} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:border-orange-400 hover:shadow-md transition-all text-left group">
-                        <div className="bg-slate-100 p-3 rounded-xl text-slate-600 group-hover:bg-orange-100 group-hover:text-orange-600 transition-colors">
-                          <t.icon size={24} />
-                        </div>
-                        <span className="font-bold text-slate-700 text-lg flex-1">{t.title}</span>
-                        <ChevronRight size={20} className="text-slate-300 group-hover:text-orange-500 transition-colors" />
-                      </button>
-                    ))}
-                  </div>
-                </section>
+        /* Scrollbar personnalisée pour le menu des thèmes */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-200 to-slate-400 text-slate-800 font-sans flex flex-col items-center justify-center p-4 sm:p-8">
 
-                <section>
-                  <h3 className="text-slate-500 font-black uppercase tracking-widest text-sm mb-4 px-2 flex items-center gap-2">
-                    <Zap size={18} /> Entraînement
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button onClick={() => setMode('flashcards')} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-3 hover:border-blue-400 hover:shadow-md transition-all group">
-                      <div className="bg-blue-50 p-4 rounded-full text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                        <BookOpen size={32} />
-                      </div>
-                      <span className="font-bold text-slate-700 text-lg">Flashcards</span>
-                    </button>
-                    <button onClick={startQuiz} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-3 hover:border-emerald-400 hover:shadow-md transition-all group">
-                      <div className="bg-emerald-50 p-4 rounded-full text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                        <Gamepad2 size={32} />
-                      </div>
-                      <span className="font-bold text-slate-700 text-lg">Quiz</span>
-                    </button>
-                  </div>
-                </section>
+    <!-- HEADER -->
+    <div class="text-center mb-8">
+        <h1 class="text-4xl sm:text-5xl font-extrabold text-slate-800 drop-shadow-md mb-3 flex items-center justify-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-orange-600"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path><path d="M14.05 2a9 9 0 0 1 8 7.94"></path><path d="M14.05 6A5 5 0 0 1 18 10"></path></svg>
+            R2.04 - Expert <span class="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-orange-700">Téléphonie</span>
+        </h1>
+        <p class="text-slate-600 font-medium text-lg">Plus de 60 concepts tirés des 26 pages du cours de M. Toussaint</p>
+    </div>
 
-              </div>
-            </div>
-          )}
+    <!-- PHONE CONTAINER -->
+    <div class="bg-slate-800 w-full max-w-4xl rounded-[2.5rem] p-4 sm:p-6 shadow-2xl relative border-8 border-slate-900">
+        
+        <!-- Notch / Camera visual detail -->
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-slate-900 rounded-b-xl z-20"></div>
 
-          {/* THEME DETAIL VIEW */}
-          {mode === 'theme' && currentTheme && (
-            <div className="flex flex-col h-full animate-in slide-in-from-right-8 duration-300 bg-slate-50">
-              <div className="bg-slate-800 px-4 py-4 flex items-center gap-3 font-bold text-white shadow-md z-10">
-                <button onClick={() => setMode('home')} className="p-2 hover:bg-slate-700 rounded-full transition-colors">
-                  <ArrowLeft size={24} />
-                </button>
-                <div className="flex items-center gap-2 truncate text-lg">
-                  <currentTheme.icon size={20} className="text-orange-400" />
-                  <span className="truncate">{currentTheme.title}</span>
+        <!-- PHONE SCREEN -->
+        <div class="bg-slate-50 w-full min-h-[600px] h-[80vh] max-h-[800px] rounded-[1.5rem] overflow-hidden flex flex-col relative shadow-[inset_0_0_20px_rgba(0,0,0,0.05)]">
+            
+            <!-- VIEW: HOME MENU -->
+            <div id="view-home" class="view flex flex-col h-full animate-fade-in">
+                <div class="bg-slate-800 px-6 py-5 flex justify-center items-center font-bold text-white shadow-md z-10">
+                    <span class="flex items-center gap-2 text-xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-orange-500"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                        Accueil de Révision
+                    </span>
                 </div>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-                {database.filter(item => currentTheme.terms.includes(item.a)).map((item, idx) => (
-                  <div key={idx} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                    <h4 className="text-xl font-black text-orange-600 mb-2">{item.a}</h4>
-                    <p className="text-slate-700 font-medium leading-relaxed">{item.d}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* FLASHCARDS VIEW */}
-          {mode === 'flashcards' && (
-            <div className="flex flex-col h-full animate-in fade-in duration-300">
-              <div className="bg-slate-200 px-4 py-4 flex justify-between items-center font-bold text-slate-600 border-b border-slate-300">
-                <button onClick={() => setMode('home')} className="flex items-center gap-1 hover:text-orange-600 transition-colors p-1">
-                  <ArrowLeft size={20} /> <span className="hidden sm:inline">Menu</span>
-                </button>
-                <span className="flex items-center gap-2"><BookOpen size={20} className="text-blue-500"/> Flashcards</span>
-                <span className="bg-slate-800 text-white px-3 py-1 rounded-full text-sm">{cardIndex + 1}/{deck.length}</span>
-              </div>
-              
-              <div className="flex-1 flex flex-col items-center justify-center p-6 relative [perspective:1000px]">
-                
-                {/* 3D Flip Card */}
-                <div 
-                  className="w-full max-w-2xl h-80 sm:h-64 cursor-pointer relative transition-all duration-500 [transform-style:preserve-3d] group hover:scale-[1.02]"
-                  onClick={() => setIsFlipped(!isFlipped)}
-                  style={{ transform: isFlipped ? 'rotateX(180deg)' : 'rotateX(0deg)' }}
-                >
-                  {/* Front (Acronym) */}
-                  <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] bg-white rounded-2xl shadow-xl border-t-8 border-orange-500 flex flex-col items-center justify-center p-8">
-                    <p className="text-slate-400 font-semibold uppercase tracking-widest text-sm mb-4">Mot ou Acronyme</p>
-                    <h2 className="text-4xl sm:text-5xl font-black text-slate-800 text-center">{deck[cardIndex].a}</h2>
-                    <p className="absolute bottom-6 text-orange-500 font-medium animate-pulse">Appuie pour révéler la définition</p>
-                  </div>
-                  
-                  {/* Back (Definition) */}
-                  <div 
-                    className="absolute inset-0 w-full h-full [backface-visibility:hidden] bg-orange-50 rounded-2xl shadow-xl border-t-8 border-orange-600 flex flex-col items-center justify-center p-6 sm:p-10"
-                    style={{ transform: 'rotateX(180deg)' }}
-                  >
-                    <p className="text-orange-800/60 font-semibold uppercase tracking-widest text-sm mb-4">Définition</p>
-                    <p className="text-lg sm:text-xl text-slate-800 font-medium text-center leading-relaxed overflow-y-auto">
-                      {deck[cardIndex].d}
-                    </p>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Controls */}
-              <div className="p-6 flex justify-center gap-4 bg-white border-t border-slate-100">
-                <button onClick={handlePrevCard} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-3 rounded-xl font-bold transition-colors">
-                  <ChevronLeft size={20} /> <span className="hidden sm:inline">Précédent</span>
-                </button>
-                <button onClick={handleShuffleDeck} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-bold transition-all hover:shadow-lg hover:shadow-orange-500/30">
-                  <Shuffle size={20} /> <span className="hidden sm:inline">Mélanger</span>
-                </button>
-                <button onClick={handleNextCard} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-3 rounded-xl font-bold transition-colors">
-                  <span className="hidden sm:inline">Suivant</span> <ChevronRight size={20} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* QUIZ VIEW */}
-          {mode === 'quiz' && (
-            <div className="flex flex-col h-full animate-in zoom-in-95 duration-300">
-              <div className="bg-slate-800 px-4 py-4 flex justify-between items-center font-bold text-white">
-                <button onClick={() => setMode('home')} className="p-1 hover:bg-slate-700 rounded-full transition-colors" title="Quitter le quiz">
-                  <XCircle size={24} className="text-slate-400 hover:text-red-400" />
-                </button>
-                <span className="flex items-center gap-2 text-red-400 animate-pulse"><div className="w-3 h-3 bg-red-500 rounded-full"></div> Évaluation</span>
-                <span className="bg-slate-700 px-3 py-1 rounded-full text-sm">Q: {currentQIndex + 1}/{Q_MAX}</span>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="w-full bg-slate-200 h-2">
-                <div 
-                  className="bg-orange-500 h-2 transition-all duration-500 ease-out" 
-                  style={{ width: `${((currentQIndex) / Q_MAX) * 100}%` }}
-                ></div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col items-center">
-                <h3 className="text-slate-500 font-bold uppercase tracking-wider text-sm mb-2 mt-4">Identifie la définition de :</h3>
-                <h2 className="text-3xl sm:text-5xl font-black text-orange-600 mb-8 text-center">{quizQuestions[currentQIndex]?.a}</h2>
-                
-                <div className="w-full max-w-3xl flex flex-col gap-3 pb-8">
-                  {quizOptions.map((opt, idx) => {
-                    const isCorrect = opt === quizQuestions[currentQIndex].d;
+                <div class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-8 bg-slate-100 pb-8">
                     
-                    let btnStyle = "bg-white border-2 border-slate-200 text-slate-700 hover:border-orange-400 hover:bg-orange-50";
-                    let Icon = null;
+                    <section>
+                        <h3 class="text-slate-500 font-black uppercase tracking-widest text-sm mb-4 px-2 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                            Cours par thèmes
+                        </h3>
+                        <div id="themes-container" class="flex flex-col gap-3">
+                            <!-- Injected via JS -->
+                        </div>
+                    </section>
 
-                    if (isAnswered) {
-                      if (isCorrect) {
-                        btnStyle = "bg-emerald-500 border-emerald-600 text-white shadow-lg shadow-emerald-500/30 scale-[1.02] z-10";
-                        Icon = <CheckCircle2 size={24} className="min-w-[24px]" />;
-                      } else if (selectedAnswer === opt) {
-                        btnStyle = "bg-red-500 border-red-600 text-white";
-                        Icon = <XCircle size={24} className="min-w-[24px]" />;
-                      } else {
-                        btnStyle = "bg-slate-100 border-slate-200 text-slate-400 opacity-50";
-                      }
-                    }
+                    <section>
+                        <h3 class="text-slate-500 font-black uppercase tracking-widest text-sm mb-4 px-2 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                            Entraînement
+                        </h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <button onclick="setMode('flashcards')" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-3 hover:border-blue-400 hover:shadow-md transition-all group">
+                                <div class="bg-blue-50 p-4 rounded-full text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                                </div>
+                                <span class="font-bold text-slate-700 text-lg">Flashcards</span>
+                            </button>
+                            <button onclick="startQuiz()" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-3 hover:border-emerald-400 hover:shadow-md transition-all group">
+                                <div class="bg-emerald-50 p-4 rounded-full text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg>
+                                </div>
+                                <span class="font-bold text-slate-700 text-lg">Quiz</span>
+                            </button>
+                        </div>
+                    </section>
 
-                    return (
-                      <button 
-                        key={idx}
-                        disabled={isAnswered}
-                        onClick={() => handleAnswerClick(opt)}
-                        className={`w-full text-left p-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-between gap-4 ${btnStyle}`}
-                      >
-                        <span className="leading-relaxed">{opt}</span>
-                        {Icon}
-                      </button>
-                    )
-                  })}
                 </div>
-              </div>
             </div>
-          )}
 
-          {/* RESULTS VIEW */}
-          {mode === 'results' && (
-            <div className="flex flex-col h-full items-center justify-center p-8 text-center animate-in slide-in-from-bottom-8 duration-500 overflow-y-auto">
-              {getFeedbackMessage().icon}
-              <h2 className="text-3xl font-black text-slate-800 mb-2">Rapport de QoS</h2>
-              
-              <div className="relative my-8">
-                <svg className="w-48 h-48 transform -rotate-90">
-                  <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-200" />
-                  <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="12" fill="transparent" 
-                    strokeDasharray={2 * Math.PI * 88} 
-                    strokeDashoffset={2 * Math.PI * 88 * (1 - score / Q_MAX)}
-                    className="text-orange-500 transition-all duration-1000 ease-out" 
-                  />
-                </svg>
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-5xl font-black text-slate-800">
-                  {score}<span className="text-2xl text-slate-400">/{Q_MAX}</span>
+            <!-- VIEW: THEME DETAIL -->
+            <div id="view-theme" class="view hidden flex-col h-full animate-slide-in-right bg-slate-50">
+                <div class="bg-slate-800 px-4 py-4 flex items-center gap-3 font-bold text-white shadow-md z-10">
+                    <button onclick="setMode('home')" class="p-2 hover:bg-slate-700 rounded-full transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    </button>
+                    <div class="flex items-center gap-2 truncate text-lg">
+                        <span id="theme-icon-container" class="text-orange-400 flex items-center"></span>
+                        <span id="theme-title" class="truncate">Titre</span>
+                    </div>
                 </div>
-              </div>
-
-              <h3 className={`text-xl font-bold mb-8 ${getFeedbackMessage().color}`}>
-                {getFeedbackMessage().msg}
-              </h3>
-
-              <div className="flex flex-wrap justify-center gap-4">
-                <button 
-                  onClick={() => setMode('home')}
-                  className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-4 rounded-full font-bold text-lg flex items-center gap-2 transition-transform hover:scale-105"
-                >
-                  <Home size={24} /> Menu
-                </button>
-                <button 
-                  onClick={startQuiz}
-                  className="bg-slate-800 hover:bg-slate-900 text-white px-6 py-4 rounded-full font-bold text-lg flex items-center gap-2 transition-transform hover:scale-105 shadow-xl shadow-slate-800/20"
-                >
-                  <RotateCcw size={24} /> Rejouer
-                </button>
-              </div>
+                <div id="theme-terms-container" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+                    <!-- Injected via JS -->
+                </div>
             </div>
-          )}
+
+            <!-- VIEW: FLASHCARDS -->
+            <div id="view-flashcards" class="view hidden flex-col h-full animate-fade-in">
+                <div class="bg-slate-200 px-4 py-4 flex justify-between items-center font-bold text-slate-600 border-b border-slate-300">
+                    <button onclick="setMode('home')" class="flex items-center gap-1 hover:text-orange-600 transition-colors p-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> 
+                        <span class="hidden sm:inline">Menu</span>
+                    </button>
+                    <span class="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg> 
+                        Flashcards
+                    </span>
+                    <span id="fc-counter" class="bg-slate-800 text-white px-3 py-1 rounded-full text-sm">1/62</span>
+                </div>
+                
+                <div class="flex-1 flex flex-col items-center justify-center p-6 relative perspective-1000">
+                    
+                    <!-- 3D Flip Card -->
+                    <div class="w-full max-w-2xl h-80 sm:h-64 cursor-pointer relative transition-all duration-500 preserve-3d group hover:scale-[1.02]" onclick="flipCard()">
+                        
+                        <!-- Front (Acronym) -->
+                        <div id="fc-front" class="absolute inset-0 w-full h-full backface-hidden bg-white rounded-2xl shadow-xl border-t-8 border-orange-500 flex flex-col items-center justify-center p-8 transition-transform duration-500">
+                            <p class="text-slate-400 font-semibold uppercase tracking-widest text-sm mb-4">Mot ou Acronyme</p>
+                            <h2 id="fc-acronym" class="text-4xl sm:text-5xl font-black text-slate-800 text-center">---</h2>
+                            <p class="absolute bottom-6 text-orange-500 font-medium animate-pulse">Appuie pour révéler la définition</p>
+                        </div>
+                        
+                        <!-- Back (Definition) -->
+                        <div id="fc-back" class="absolute inset-0 w-full h-full backface-hidden bg-orange-50 rounded-2xl shadow-xl border-t-8 border-orange-600 flex flex-col items-center justify-center p-6 sm:p-10 rotate-x-180 transition-transform duration-500">
+                            <p class="text-orange-800/60 font-semibold uppercase tracking-widest text-sm mb-4">Définition</p>
+                            <p id="fc-def" class="text-lg sm:text-xl text-slate-800 font-medium text-center leading-relaxed overflow-y-auto w-full">---</p>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Controls -->
+                <div class="p-6 flex justify-center gap-4 bg-white border-t border-slate-100">
+                    <button onclick="prevCard()" class="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-3 rounded-xl font-bold transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg> 
+                        <span class="hidden sm:inline">Précédent</span>
+                    </button>
+                    <button onclick="shuffleDeck()" class="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-bold transition-all hover:shadow-lg hover:shadow-orange-500/30">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg> 
+                        <span class="hidden sm:inline">Mélanger</span>
+                    </button>
+                    <button onclick="nextCard()" class="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-3 rounded-xl font-bold transition-colors">
+                        <span class="hidden sm:inline">Suivant</span> 
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- VIEW: QUIZ -->
+            <div id="view-quiz" class="view hidden flex-col h-full animate-zoom-in">
+                <div class="bg-slate-800 px-4 py-4 flex justify-between items-center font-bold text-white">
+                    <button onclick="setMode('home')" class="p-1 hover:bg-slate-700 rounded-full transition-colors" title="Quitter le quiz">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400 hover:text-red-400"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                    </button>
+                    <span class="flex items-center gap-2 text-red-400 animate-pulse"><div class="w-3 h-3 bg-red-500 rounded-full"></div> Évaluation</span>
+                    <span id="quiz-counter" class="bg-slate-700 px-3 py-1 rounded-full text-sm">Q: 1/15</span>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="w-full bg-slate-200 h-2">
+                    <div id="quiz-progress" class="bg-orange-500 h-2 transition-all duration-500 ease-out" style="width: 0%"></div>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col items-center">
+                    <h3 class="text-slate-500 font-bold uppercase tracking-wider text-sm mb-2 mt-4">Identifie la définition de :</h3>
+                    <h2 id="q-acronym" class="text-3xl sm:text-5xl font-black text-orange-600 mb-8 text-center">---</h2>
+                    
+                    <div id="q-options" class="w-full max-w-3xl flex flex-col gap-3 pb-8">
+                        <!-- Injected via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: RESULTS -->
+            <div id="view-results" class="view hidden flex-col h-full items-center justify-center p-8 text-center animate-slide-in-bottom overflow-y-auto">
+                <div id="res-icon-container" class="mb-4"></div>
+                <h2 class="text-3xl font-black text-slate-800 mb-2">Rapport de QoS</h2>
+                
+                <div class="relative my-8">
+                    <svg class="w-48 h-48 transform -rotate-90">
+                        <circle cx="96" cy="96" r="88" stroke="currentColor" stroke-width="12" fill="transparent" class="text-slate-200" />
+                        <circle id="res-circle" cx="96" cy="96" r="88" stroke="currentColor" stroke-width="12" fill="transparent" 
+                            stroke-dasharray="553" 
+                            stroke-dashoffset="553"
+                            class="text-orange-500 transition-all duration-1000 ease-out" 
+                        />
+                    </svg>
+                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-5xl font-black text-slate-800">
+                        <span id="res-score">0</span><span class="text-2xl text-slate-400">/15</span>
+                    </div>
+                </div>
+
+                <h3 id="res-msg" class="text-xl font-bold mb-8">---</h3>
+
+                <div class="flex flex-wrap justify-center gap-4">
+                    <button onclick="setMode('home')" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-4 rounded-full font-bold text-lg flex items-center gap-2 transition-transform hover:scale-105">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg> Menu
+                    </button>
+                    <button onclick="startQuiz()" class="bg-slate-800 hover:bg-slate-900 text-white px-6 py-4 rounded-full font-bold text-lg flex items-center gap-2 transition-transform hover:scale-105 shadow-xl shadow-slate-800/20">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg> Rejouer
+                    </button>
+                </div>
+            </div>
 
         </div>
-      </div>
     </div>
-  );
-}
+
+    <script>
+        // --- BASE DE DONNÉES COMPLÈTE (62 éléments) ---
+        const database = [
+            { a: "Full-duplex", d: "Mode de communication dans les deux sens en même temps (typique de la téléphonie)." },
+            { a: "Half-duplex", d: "Communication dans un sens puis l'autre, pas en même temps (ex: talkie-walkie)." },
+            { a: "Signalisation", d: "Ensemble des messages échangés sur le réseau pour mettre en œuvre un service (décrocher, numéroter, faire sonner)." },
+            { a: "RTC", d: "Réseau Téléphonique Commuté. Le réseau analogique historique (en cours de démantèlement, fin prévue 2030)." },
+            { a: "URA", d: "Unité de Raccordement d'Abonnés. Équipement du réseau historique opérateur." },
+            { a: "Répartiteur", d: "Salle historique chez l'opérateur (Orange) où arrivent toutes les lignes de cuivre des abonnés." },
+            { a: "DSLAM", d: "Multiplexeur d'accès DSL. Équipement opérateur pour grouper le trafic internet ADSL." },
+            { a: "DTMF (Q23)", d: "Dual-Tone Multi-Frequency. Envoi de combinaisons de 2 fréquences à partir du commutateur pour envoyer le numéro appelé." },
+            { a: "Bande 300-3400 Hz", d: "La bande de fréquences utilisée pour transmettre la voix humaine en téléphonie analogique classique." },
+            { a: "RNIS", d: "Réseau Numérique à Intégration de Services (ex: Numéris). Remplaçant de l'analogique avant la VoIP." },
+            { a: "Accès T0 (BRI)", d: "Accès de base RNIS : comprend 2 canaux B à 64kbps (voix) + 1 canal D à 16kbps (signalisation)." },
+            { a: "Accès T2 (PRI)", d: "Accès primaire RNIS : comprend 30 canaux B (pour la voix) + 1 canal D (pour la signalisation)." },
+            { a: "Canal D", d: "Le canal du réseau RNIS réservé exclusivement au transport de la signalisation (messages Q931)." },
+            { a: "Q.931", d: "Protocole de signalisation utilisé sur le canal D du réseau RNIS." },
+            { a: "SETUP", d: "Message Q.931 envoyé pour demander l'établissement d'un appel RNIS." },
+            { a: "CONNECT", d: "Message Q.931 indiquant que l'appelé a décroché et que la conversation commence." },
+            { a: "PABX", d: "Private Automatic Branch eXchange. L'autocommutateur traditionnel (analogique/numérique) d'une entreprise." },
+            { a: "IPBX", d: "PABX moderne organisé autour d'un Serveur d'appel, gérant la téléphonie sur réseau IP." },
+            { a: "Centrex IP", d: "Solution où l'IPBX (le serveur d'appel) n'est pas dans l'entreprise mais déporté dans le cloud chez l'opérateur ITSP." },
+            { a: "Hardphone", d: "Téléphone IP physique posé sur le bureau." },
+            { a: "Softphone", d: "Logiciel de téléphonie installé sur PC, nécessitant casque et micro (possède souvent la fonction click2call)." },
+            { a: "POPC", d: "Poste Opérateur PC. L'outil informatique du standardiste." },
+            { a: "DECT", d: "Norme de la téléphonie sans fil. Dans une entreprise, les combinés DECT se connectent à des bornes raccordées au LAN." },
+            { a: "SDA / DID", d: "Sélection Directe à l'Arrivée (Direct Inward Dialling). Permet d'appeler directement un poste interne sans passer par l'accueil." },
+            { a: "SVI", d: "Serveur Vocal Interactif. Répond avec des menus vocaux navigués via les touches DTMF ('Tapez 1...')." },
+            { a: "ACD", d: "Distribution Automatique d'Appel. Oriente l'appel entrant vers un groupe selon la compétence ou disponibilité." },
+            { a: "PoE (802.3af)", d: "Power over Ethernet. Norme permettant au Switch d'alimenter électriquement le téléphone IP via le câble RJ45." },
+            { a: "LAN", d: "Le réseau local de l'entreprise où sont branchés les PC et les téléphones IP." },
+            { a: "VLAN", d: "Réseau virtuel. On sépare souvent les PC et les téléphones sur deux VLANs distincts pour la sécurité et la QoS." },
+            { a: "DHCP", d: "Protocole qui attribue automatiquement une adresse IP au téléphone fixe quand il démarre." },
+            { a: "FTP / TFTP", d: "Protocoles utilisés par le téléphone IP pour récupérer sa configuration ou mettre à jour son Firmware au démarrage." },
+            { a: "ARCEP", d: "L'autorité française de régulation qui gère le plan de numérotation national." },
+            { a: "E.164", d: "Recommandation de l'UIT-T décrivant la façon d'attribuer les numéros de téléphone internationaux." },
+            { a: "ZABPQ", d: "Format du plan de numérotation français à 10 chiffres (Z = zone géo, A/B = commutateur, P/Q = équipement)." },
+            { a: "ToIP", d: "Telephony over IP. L'infrastructure complète (matériel + réseau) pour faire de la téléphonie sur IP en entreprise." },
+            { a: "VoIP", d: "La technique de production et de transport de paquets contenant la voix numérisée." },
+            { a: "Codec", d: "Codeur/Décodeur. Algorithme qui numérise et compresse la voix. Ex: G.711, G.722, G.729, Opus." },
+            { a: "G.711", d: "Codec très courant (alaw ou ulaw) échantillonnant la voix à 8kHz, nécessitant environ 64 kbps de bande passante." },
+            { a: "Paquet de voix", d: "En ToIP, on regroupe généralement 20 ms d'échantillons de voix dans un seul paquet IP." },
+            { a: "Silence Suppression", d: "Technique réseau permettant de ne rien émettre si personne ne parle, pour économiser la bande passante." },
+            { a: "RTP", d: "Realtime Transport Protocol. Le protocole (généralement sur UDP) qui transporte effectivement les paquets de voix." },
+            { a: "RTCP", d: "Realtime Transport Control Protocol. Contrôle le flux RTP en remontant l'état de la transmission (pertes, gigue)." },
+            { a: "SRTP", d: "Secure RTP. Chiffre le flux de la voix pour empêcher l'écoute pirate (replay)." },
+            { a: "QoS", d: "Quality of Service. Règles configurées sur les switchs/routeurs pour prioriser les paquets Voix par rapport aux Data." },
+            { a: "Latence", d: "Temps entre l'émission de la voix et sa réception. Doit être inférieur à 150 ms." },
+            { a: "Gigue (Jitter)", d: "La variation de la latence entre les différents paquets. Doit être inférieure à 40 ms." },
+            { a: "802.1p/q", d: "Normes permettant de marquer les trames Ethernet au niveau 2 (Switch) pour appliquer la QoS." },
+            { a: "DiffServ", d: "Mécanisme de QoS au niveau 3 (Routeur) modifiant le champ DSCP de l'en-tête du paquet IP." },
+            { a: "SIP", d: "Session Initiation Protocol. Le protocole de signalisation star (RFC 3261 par l'IETF) pour établir/gérer les appels." },
+            { a: "H.323", d: "L'ancêtre de SIP. Protocole de signalisation historique de la ToIP, quasiment disparu aujourd'hui." },
+            { a: "ITSP", d: "Internet Telephony Service Provider (ex: OVH, Orange). Fournisseur de liens Trunk SIP pour sortir vers l'extérieur." },
+            { a: "Trunk SIP", d: "La liaison 'virtuelle' entre l'IPBX de l'entreprise et l'opérateur (ITSP) via Internet." },
+            { a: "AOR", d: "Address Of Record. Identifiant SIP d'un usager, format type e-mail (ex: sip:jean@domaine.fr)." },
+            { a: "Proxy SIP", d: "Entité du serveur SIP qui retransmet les requêtes vers le bon interlocuteur." },
+            { a: "Registrar", d: "Serveur SIP où le téléphone vient enregistrer son adresse IP actuelle pour qu'on puisse le retrouver." },
+            { a: "Serveur de localisation", d: "Base de données stockant les localisations (adresses IP) des téléphones, alimentée par le Registrar." },
+            { a: "INVITE", d: "Requête SIP. Demande d'établissement d'appel (C'est le début d'un dialogue)." },
+            { a: "REGISTER", d: "Requête SIP. Demande d'enregistrement d'un téléphone auprès du serveur Registrar." },
+            { a: "ACK", d: "Requête SIP. Confirme obligatoirement la bonne réception d'une réponse finale (comme un 200 OK)." },
+            { a: "BYE", d: "Requête SIP. Termine un appel (correspond au raccrochage)." },
+            { a: "100 Trying", d: "Réponse SIP (Provisoire). Indique que le serveur a bien reçu l'INVITE et le traite." },
+            { a: "180 Ringing", d: "Réponse SIP (Provisoire). Indique que le téléphone de destination est en train de sonner." },
+            { a: "200 OK", d: "Réponse SIP (Positive). Indique le succès de la requête (La personne a décroché, ou le REGISTER a marché)." },
+            { a: "401 Unauthorized", d: "Réponse SIP (Erreur). Le serveur refuse l'action et demande à l'usager de s'authentifier (login/mdp)." }
+        ];
+
+        // --- ICONS SVG (Lucide) ---
+        const icons = {
+            History: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>',
+            Hash: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>',
+            Network: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>',
+            Server: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>',
+            Gauge: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 16.998A10 10 0 1 1 20.66 17"/><path d="m12 14 4-4"/></svg>',
+            MessageSquare: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+            Trophy: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-4 text-emerald-500"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>',
+            Award: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-4 text-blue-500"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>',
+            AlertTriangle: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-4 text-orange-500"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+            Zap: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-4 text-red-500"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+            CheckCircle: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="min-w-[24px]"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+            XCircle: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="min-w-[24px]"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+        };
+
+        const themesData = [
+            { id: "bases", title: "Bases & Réseaux Historiques", iconKey: 'History', terms: ["Full-duplex", "Half-duplex", "Signalisation", "RTC", "URA", "Répartiteur", "DSLAM", "Bande 300-3400 Hz"] },
+            { id: "num", title: "Numérotation", iconKey: 'Hash', terms: ["DTMF (Q23)", "ARCEP", "E.164", "ZABPQ"] },
+            { id: "rnis", title: "Réseau RNIS", iconKey: 'Network', terms: ["RNIS", "Accès T0 (BRI)", "Accès T2 (PRI)", "Canal D", "Q.931", "SETUP", "CONNECT"] },
+            { id: "archi", title: "Équipements & Architecture", iconKey: 'Server', terms: ["PABX", "IPBX", "Centrex IP", "Hardphone", "Softphone", "POPC", "DECT", "SDA / DID", "SVI", "ACD", "PoE (802.3af)", "LAN", "VLAN", "DHCP", "FTP / TFTP"] },
+            { id: "toip", title: "ToIP, VoIP & QoS", iconKey: 'Gauge', terms: ["ToIP", "VoIP", "Codec", "G.711", "Paquet de voix", "Silence Suppression", "RTP", "RTCP", "SRTP", "QoS", "Latence", "Gigue (Jitter)", "802.1p/q", "DiffServ"] },
+            { id: "sip", title: "Protocoles & SIP", iconKey: 'MessageSquare', terms: ["SIP", "H.323", "ITSP", "Trunk SIP", "AOR", "Proxy SIP", "Registrar", "Serveur de localisation", "INVITE", "REGISTER", "ACK", "BYE", "100 Trying", "180 Ringing", "200 OK", "401 Unauthorized"] }
+        ];
+
+        // --- ETAT GLOBAL ---
+        let currentMode = 'home';
+        let deck = [...database];
+        
+        // Flashcards
+        let cardIndex = 0;
+        let isFlipped = false;
+
+        // Quiz
+        const Q_MAX = 15;
+        let quizQuestions = [];
+        let currentQIndex = 0;
+        let score = 0;
+        let isAnswered = false;
+
+        // --- NAVIGATION ---
+        function setMode(mode) {
+            document.querySelectorAll('.view').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${mode}`).classList.remove('hidden');
+            currentMode = mode;
+            if (mode === 'flashcards') updateFlashcardUI();
+        }
+
+        // --- INITIALISATION MENU ---
+        function initHome() {
+            const container = document.getElementById('themes-container');
+            container.innerHTML = themesData.map(t => `
+                <button onclick="openTheme('${t.id}')" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:border-orange-400 hover:shadow-md transition-all text-left group w-full">
+                    <div class="bg-slate-100 p-3 rounded-xl text-slate-600 group-hover:bg-orange-100 group-hover:text-orange-600 transition-colors">
+                        ${icons[t.iconKey]}
+                    </div>
+                    <span class="font-bold text-slate-700 text-lg flex-1">${t.title}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-300 group-hover:text-orange-500 transition-colors"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+            `).join('');
+        }
+
+        function openTheme(id) {
+            const theme = themesData.find(t => t.id === id);
+            if (!theme) return;
+            
+            document.getElementById('theme-icon-container').innerHTML = icons[theme.iconKey];
+            document.getElementById('theme-title').innerText = theme.title;
+            
+            const termsHtml = database
+                .filter(item => theme.terms.includes(item.a))
+                .map(item => `
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <h4 class="text-xl font-black text-orange-600 mb-2">${item.a}</h4>
+                        <p class="text-slate-700 font-medium leading-relaxed">${item.d}</p>
+                    </div>
+                `).join('');
+            
+            document.getElementById('theme-terms-container').innerHTML = termsHtml;
+            setMode('theme');
+        }
+
+        // --- FLASHCARDS LOGIC ---
+        function updateFlashcardUI() {
+            document.getElementById('fc-counter').innerText = `${cardIndex + 1}/${deck.length}`;
+            document.getElementById('fc-acronym').innerText = deck[cardIndex].a;
+            document.getElementById('fc-def').innerText = deck[cardIndex].d;
+        }
+
+        function flipCard() {
+            isFlipped = !isFlipped;
+            const front = document.getElementById('fc-front');
+            const back = document.getElementById('fc-back');
+            
+            if (isFlipped) {
+                front.classList.add('rotate-x-180');
+                back.classList.remove('rotate-x-180');
+            } else {
+                front.classList.remove('rotate-x-180');
+                back.classList.add('rotate-x-180');
+            }
+        }
+
+        function nextCard() {
+            if (isFlipped) flipCard();
+            setTimeout(() => {
+                cardIndex = (cardIndex + 1) % deck.length;
+                updateFlashcardUI();
+            }, 150);
+        }
+
+        function prevCard() {
+            if (isFlipped) flipCard();
+            setTimeout(() => {
+                cardIndex = (cardIndex - 1 + deck.length) % deck.length;
+                updateFlashcardUI();
+            }, 150);
+        }
+
+        function shuffleDeck() {
+            deck = [...database].sort(() => Math.random() - 0.5);
+            cardIndex = 0;
+            if (isFlipped) flipCard();
+            setTimeout(updateFlashcardUI, 150);
+        }
+
+        // Keyboard navigation
+        window.addEventListener('keydown', (e) => {
+            if (currentMode !== 'flashcards') return;
+            if (e.key === 'ArrowRight') nextCard();
+            if (e.key === 'ArrowLeft') prevCard();
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                flipCard();
+            }
+        });
+
+        // --- QUIZ LOGIC ---
+        function startQuiz() {
+            const shuffled = [...database].sort(() => Math.random() - 0.5);
+            quizQuestions = shuffled.slice(0, Q_MAX);
+            currentQIndex = 0;
+            score = 0;
+            isAnswered = false;
+            setMode('quiz');
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            isAnswered = false;
+            const q = quizQuestions[currentQIndex];
+            
+            document.getElementById('quiz-counter').innerText = `Q: ${currentQIndex + 1}/${Q_MAX}`;
+            document.getElementById('quiz-progress').style.width = `${(currentQIndex / Q_MAX) * 100}%`;
+            document.getElementById('q-acronym').innerText = q.a;
+
+            let options = [q.d];
+            let safety = 0;
+            while (options.length < 4 && safety < 1000) {
+                const randomDef = database[Math.floor(Math.random() * database.length)].d;
+                if (!options.includes(randomDef)) options.push(randomDef);
+                safety++;
+            }
+            options = options.sort(() => Math.random() - 0.5);
+
+            const container = document.getElementById('q-options');
+            container.innerHTML = options.map((opt, idx) => `
+                <button id="btn-opt-${idx}" onclick="handleAnswer('${opt.replace(/'/g, "\\'")}', this, '${q.d.replace(/'/g, "\\'")}')" 
+                    class="w-full text-left p-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-between gap-4 bg-white border-2 border-slate-200 text-slate-700 hover:border-orange-400 hover:bg-orange-50">
+                    <span class="leading-relaxed">${opt}</span>
+                    <span id="icon-opt-${idx}" class="hidden"></span>
+                </button>
+            `).join('');
+        }
+
+        function handleAnswer(selectedOpt, btnElement, correctOpt) {
+            if (isAnswered) return;
+            isAnswered = true;
+
+            const isCorrect = selectedOpt === correctOpt;
+            if (isCorrect) score++;
+
+            // Update all buttons styling
+            const allBtns = document.getElementById('q-options').querySelectorAll('button');
+            allBtns.forEach((btn, idx) => {
+                const optText = btn.querySelector('span').innerText;
+                const iconSpan = btn.querySelector('span:last-child');
+                iconSpan.classList.remove('hidden');
+
+                if (optText === correctOpt) {
+                    btn.className = "w-full text-left p-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-between gap-4 bg-emerald-500 border-2 border-emerald-600 text-white shadow-lg shadow-emerald-500/30 scale-[1.02] z-10";
+                    iconSpan.innerHTML = icons.CheckCircle;
+                } else if (optText === selectedOpt && !isCorrect) {
+                    btn.className = "w-full text-left p-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-between gap-4 bg-red-500 border-2 border-red-600 text-white";
+                    iconSpan.innerHTML = icons.XCircle;
+                } else {
+                    btn.className = "w-full text-left p-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-between gap-4 bg-slate-100 border-2 border-slate-200 text-slate-400 opacity-50";
+                }
+            });
+
+            setTimeout(() => {
+                if (currentQIndex + 1 < Q_MAX) {
+                    currentQIndex++;
+                    loadQuestion();
+                } else {
+                    showResults();
+                }
+            }, 1800);
+        }
+
+        // --- RESULTS LOGIC ---
+        function showResults() {
+            setMode('results');
+            document.getElementById('res-score').innerText = score;
+            
+            // Animation du cercle SVG
+            const circle = document.getElementById('res-circle');
+            const circumference = 2 * Math.PI * 88;
+            const offset = circumference - (score / Q_MAX) * circumference;
+            setTimeout(() => { circle.style.strokeDashoffset = offset; }, 100);
+
+            // Message et couleur
+            let msg = "", colorCls = "", iconHtml = "";
+            if (score === Q_MAX) {
+                msg = "100% de paquets reçus. Masterclass SIP ! 🏆"; colorCls = "text-emerald-500"; iconHtml = icons.Trophy;
+            } else if (score >= 12) {
+                msg = "Excellent niveau. Tu es prêt pour l'exam R2.04. 👍"; colorCls = "text-blue-500"; iconHtml = icons.Award;
+            } else if (score >= 8) {
+                msg = "Un peu de gigue... Fais encore quelques flashcards ! 📻"; colorCls = "text-orange-500"; iconHtml = icons.AlertTriangle;
+            } else {
+                msg = "Erreur 401 Unauthorized. Il faut réviser le cours ! ✂️"; colorCls = "text-red-500"; iconHtml = icons.Zap;
+            }
+
+            document.getElementById('res-msg').innerText = msg;
+            document.getElementById('res-msg').className = `text-xl font-bold mb-8 ${colorCls}`;
+            document.getElementById('res-icon-container').innerHTML = iconHtml;
+        }
+
+        // Start
+        initHome();
+    </script>
+</body>
+</html>
